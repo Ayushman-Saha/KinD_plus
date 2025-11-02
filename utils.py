@@ -1,8 +1,8 @@
 import numpy as np
 from PIL import Image
-#import tensorflow as tf
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import tensorflow as tf
+# import tensorflow.compat.v1 as tf
+# tf.disable_v2_behavior()
 import scipy.stats as st
 from skimage import io,data,color
 from functools import reduce
@@ -254,6 +254,23 @@ def load_images_hsv(file):
     return hsv
 
 def save_images(filepath, result_1, result_2 = None, result_3 = None):
+    # result_1 = tf.squeeze(result_1)
+    # print(result_1)
+    # # result_2 = tf.squeeze(result_2)
+    # # result_3 = tf.squeeze(result_3)
+    # #
+    # # if not result_2.any():
+    # #     cat_image = result_1
+    # # else:
+    # #     cat_image = tf.keras.layers.Concatenate(axis = 1)([result_1, result_2])
+    # # if not result_3.any():
+    # #     cat_image = cat_image
+    # # else:
+    # #     cat_image = tf.keras.layers.Concatenate(axis = 1)([cat_image, result_3])
+    #
+    # result_1_uint8 = tf.image.convert_image_dtype(result_1, tf.uint8, True)
+    # im = Image.fromarray(np.clip(result_1_uint8.numpy(), 0, 255.0).astype('uint8'))
+    # im.save(filepath, 'png')
     result_1 = np.squeeze(result_1)
     result_2 = np.squeeze(result_2)
     result_3 = np.squeeze(result_3)
@@ -269,3 +286,85 @@ def save_images(filepath, result_1, result_2 = None, result_3 = None):
 
     im = Image.fromarray(np.clip(cat_image * 255.0, 0, 255.0).astype('uint8'))
     im.save(filepath, 'png')
+
+import rawpy
+import exifread
+
+def read_dng_all(filepath, unpack_bayer=True):
+    """
+    Read all data from a .DNG (RAW) file.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the .dng file.
+    unpack_bayer : bool, optional
+        If True, unpack the Bayer pattern into 4 channels (R, G1, G2, B).
+
+    Returns
+    -------
+    data : dict
+        Dictionary containing:
+            - raw_image : np.ndarray
+                2D Bayer image (linear RAW data)
+            - raw_4ch : np.ndarray or None
+                4-channel Bayer (R, G1, G2, B) if unpack_bayer=True
+            - rgb : np.ndarray
+                Demosaiced RGB image (linear, float32, [0–1])
+            - metadata : dict
+                Dictionary of EXIF and camera metadata
+    """
+
+    # ---- 1️⃣ Read RAW image with rawpy ----
+    with rawpy.imread(filepath) as raw:
+        raw_image = raw.raw_image_visible.astype(np.float32)
+
+        black_level = float(np.mean(raw.black_level_per_channel))
+        white_level = float(raw.white_level)
+
+        # Normalize to [0, 1]
+        raw_image = np.maximum(raw_image - black_level, 0) / (white_level - black_level)
+
+        # Optional: unpack 4 Bayer channels (R, G1, G2, B)
+        raw_4ch = None
+        if unpack_bayer:
+            H, W = raw_image.shape
+            raw_4ch = np.zeros((H // 2, W // 2, 4), dtype=np.float32)
+            raw_4ch[..., 0] = raw_image[0::2, 0::2]  # R
+            raw_4ch[..., 1] = raw_image[0::2, 1::2]  # G1
+            raw_4ch[..., 2] = raw_image[1::2, 0::2]  # G2
+            raw_4ch[..., 3] = raw_image[1::2, 1::2]  # B
+
+        # Demosaic to RGB (linear space, 16-bit)
+        rgb = raw.postprocess(
+            use_camera_wb=True,
+            half_size=False,
+            no_auto_bright=True,
+            output_bps=16
+        )
+        rgb = np.float32(rgb / 65535.0)
+
+        # ---- 2️⃣ Extract metadata (EXIF + camera) ----
+        metadata = {
+            "camera_whitebalance": getattr(raw, "camera_whitebalance", None),
+            "color_matrix": getattr(raw, "color_matrix", None),
+            "black_level_per_channel": raw.black_level_per_channel,
+            "white_level": raw.white_level,
+            "cfa_pattern": raw.raw_pattern.tolist(),
+            "raw_size": raw_image.shape
+        }
+
+        # Add EXIF info
+        with open(filepath, 'rb') as f:
+            exif_tags = exifread.process_file(f, details=False)
+        metadata["exif"] = {tag: str(val) for tag, val in exif_tags.items()}
+
+    # ---- 3️⃣ Return everything ----
+    return {
+        "raw_image": raw_image,   # 2D sensor data
+        "raw_4ch": raw_4ch,       # R, G1, G2, B
+        "rgb": rgb,               # Demosaiced RGB
+        "metadata": metadata      # All metadata
+    }
+
+
