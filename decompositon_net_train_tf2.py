@@ -10,12 +10,12 @@ from model_tf2 import DecomNet
 # --- Hyperparameters ---
 batch_size = 10
 patch_size = 48
-epochs = 500
+epochs = 2500
 learning_rate = 1e-4
 train_data_dir = './LOLdataset/our485'
 train_result_dir = './decom_net_train_result'
 checkpoint_dir = './checkpoint/decom_net_retrain/'
-eval_every_epoch = 100
+eval_every_epoch = 500
 
 os.makedirs(train_result_dir, exist_ok=True)
 os.makedirs(checkpoint_dir, exist_ok=True)

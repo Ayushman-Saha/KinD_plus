@@ -19,8 +19,8 @@ from model_tf2 import DecomNet, Illumination_adjust_net, lrelu
 batch_size = 10
 patch_size = 48
 initial_learning_rate = 0.0001
-epochs = 500
-eval_every_epoch = 200
+epochs = 2500
+eval_every_epoch = 500
 
 # Enable GPU memory growth
 physical_devices = tf.config.list_physical_devices('GPU')

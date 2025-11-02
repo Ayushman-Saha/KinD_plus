@@ -1,0 +1,45 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Results and checkpoints (will be mounted as volumes)
+checkpoint/
+*_train_result/
+*_train_results/
+test_results/
+figures/
+
+# Datasets (will be mounted as volumes)
+LOLdataset/
+test_images/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.md
+!README.md
